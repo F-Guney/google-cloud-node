@@ -1,11 +1,31 @@
 import express, { Request, Response } from "express";
 import { InstancesClient } from "@google-cloud/compute";
+import protos from "@google-cloud/compute/build/protos/protos";
 import auth from "../../lib/google";
 
 const router = express.Router();
 
+async function findZone(instanceName: string) {
+  const computeClient = new InstancesClient({ auth });
+  const aggListRequest = computeClient.aggregatedListAsync({
+    project: await computeClient.getProjectId(),
+  });
+
+  for await (const [zone, instancesObject] of aggListRequest) {
+    const instances = instancesObject.instances;
+
+    if (instances && instances.length > 0) {
+      for (const instance of instances) {
+        if (instance.name === instanceName) {
+          const instanceZone = zone.split("/").pop();
+          return instanceZone;
+        }
+      }
+    }
+  }
+}
+
 interface VmPowerRequestBody {
-  zone: string;
   option: "start" | "stop" | "suspend" | "reset" | "resume";
 }
 
@@ -25,7 +45,6 @@ router.get("/", async (req, res) => {
     if (instances && instances.length > 0) {
       for (const instance of instances) {
         const instanceZone = zone.split("/").pop();
-        instance.zone;
         list.push({
           id: instance.id,
           name: instance.name,
@@ -39,6 +58,30 @@ router.get("/", async (req, res) => {
   res.send(list);
 });
 
+router.get(
+  "/:name",
+  async (
+    req: Request<{ name: string }, {}, {}, { zone: string }>,
+    res: Response
+  ) => {
+    try {
+      const { name } = req.params;
+      const computeClient = new InstancesClient({ auth });
+      const instance = await computeClient.get({
+        instance: name,
+        project: await computeClient.getProjectId(),
+        zone: await findZone(name),
+      });
+
+      res.send({
+        info: instance,
+      });
+    } catch (error: any) {
+      console.log(error.message);
+    }
+  }
+);
+
 router.post(
   "/:name/power",
   async (
@@ -47,15 +90,24 @@ router.post(
   ) => {
     try {
       const { name } = req.params;
-      const { zone, option } = req.body;
+      const { option } = req.body;
       const computeClient = new InstancesClient({ auth });
 
       const vmPowerOptions = {
-        start: (request: any) => computeClient.start(request),
-        resume: (request: any) => computeClient.resume(request),
-        stop: (request: any) => computeClient.stop(request),
-        suspend: (request: any) => computeClient.suspend(request),
-        reset: (request: any) => computeClient.reset(request),
+        start: (
+          request: protos.google.cloud.compute.v1.IStartInstanceRequest
+        ) => computeClient.start(request),
+        resume: (
+          request: protos.google.cloud.compute.v1.IResumeInstanceRequest
+        ) => computeClient.resume(request),
+        stop: (request: protos.google.cloud.compute.v1.IStopInstanceRequest) =>
+          computeClient.stop(request),
+        suspend: (
+          request: protos.google.cloud.compute.v1.ISuspendInstanceRequest
+        ) => computeClient.suspend(request),
+        reset: (
+          request: protos.google.cloud.compute.v1.IResetInstanceRequest
+        ) => computeClient.reset(request),
       };
 
       if (!vmPowerOptions.hasOwnProperty(option)) {
@@ -65,10 +117,10 @@ router.post(
       await vmPowerOptions[option]({
         instance: name,
         project: await computeClient.getProjectId(),
-        zone: zone,
+        zone: await findZone(name),
       });
 
-      res.send({ message: "Analiz ediliyoru" });
+      res.status(200).send({ message: "Analiz ediliyor..." });
     } catch (error: any) {
       console.log(error);
       res.send({ error: error.message });
