@@ -74,7 +74,8 @@ router.get(
       });
 
       res.send({
-        info: instance,
+        data: instance[0],
+        info: instance[1],
       });
     } catch (error: any) {
       console.log(error.message);
