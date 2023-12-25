@@ -61,7 +61,7 @@ router.get("/", async (req, res) => {
 router.get(
   "/:name",
   async (
-    req: Request<{ name: string }, {}, {}, { zone: string }>,
+    req: Request<{ name: string }>,
     res: Response
   ) => {
     try {
