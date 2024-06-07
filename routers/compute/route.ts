@@ -58,30 +58,24 @@ router.get("/", async (req, res) => {
   res.send(list);
 });
 
-router.get(
-  "/:name",
-  async (
-    req: Request<{ name: string }>,
-    res: Response
-  ) => {
-    try {
-      const { name } = req.params;
-      const computeClient = new InstancesClient({ auth });
-      const instance = await computeClient.get({
-        instance: name,
-        project: await computeClient.getProjectId(),
-        zone: await findZone(name),
-      });
+router.get("/:name", async (req: Request<{ name: string }>, res: Response) => {
+  try {
+    const { name } = req.params;
+    const computeClient = new InstancesClient({ auth });
+    const instance = await computeClient.get({
+      instance: name,
+      project: await computeClient.getProjectId(),
+      zone: await findZone(name),
+    });
 
-      res.send({
-        data: instance[0],
-        info: instance[1],
-      });
-    } catch (error: any) {
-      console.log(error.message);
-    }
+    res.send({
+      data: instance[0],
+      info: instance[1],
+    });
+  } catch (error: any) {
+    console.log(error.message);
   }
-);
+});
 
 router.post(
   "/:name/power",
@@ -121,7 +115,7 @@ router.post(
         zone: await findZone(name),
       });
 
-      res.status(200).send({ message: "Analiz ediliyor..." });
+      res.status(200).send({ message: "Waiting Response..." });
     } catch (error: any) {
       console.log(error);
       res.send({ error: error.message });
